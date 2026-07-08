@@ -1,24 +1,34 @@
 // src/utils/api.ts
-// ВРЕМЕННО: без AsyncStorage (для теста)
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
+// TODO: перед подключением второго клиента вынести в конфиг
+// (app.config.ts / EAS-профиль или ввод адреса сервера при первом входе)
 const API_BASE = "https://abziceberg.ru/api";
 
-// Простое хранилище в памяти
-let memoryToken: string | null = null;
-let memoryUser: any = null;
+const TOKEN_KEY = "token";
+const USER_KEY = "user";
+
+export async function getToken() {
+  return AsyncStorage.getItem(TOKEN_KEY);
+}
+
+async function authHeaders() {
+  const token = await getToken();
+  return {
+    Authorization: token ? `Bearer ${token}` : "",
+    "Content-Type": "application/json",
+    Accept: "application/json",
+  };
+}
 
 export async function fetchShipments() {
   try {
-    const token = memoryToken;
-    console.log("🔵 Token:", token ? "есть" : "нет");
+    const headers = await authHeaders();
+    console.log("🔵 Token:", headers.Authorization ? "есть" : "нет");
 
     const response = await fetch(`${API_BASE}/all-data`, {
       method: "GET",
-      headers: {
-        Authorization: token ? `Bearer ${token}` : "",
-        "Content-Type": "application/json",
-        Accept: "application/json",
-      },
+      headers,
     });
 
     console.log("🔵 Status:", response.status);
@@ -50,8 +60,8 @@ export async function login(username: string, password: string) {
     console.log("🔵 Login response:", data);
 
     if (response.ok && data.token) {
-      memoryToken = data.token;
-      memoryUser = data.user;
+      await AsyncStorage.setItem(TOKEN_KEY, data.token);
+      await AsyncStorage.setItem(USER_KEY, JSON.stringify(data.user));
       return data;
     }
     throw new Error(data.error || "Login failed");
@@ -62,12 +72,13 @@ export async function login(username: string, password: string) {
 }
 
 export async function logout() {
-  memoryToken = null;
-  memoryUser = null;
+  await AsyncStorage.removeItem(TOKEN_KEY);
+  await AsyncStorage.removeItem(USER_KEY);
 }
 
-export async function getToken() {
-  return memoryToken;
+export async function getUser() {
+  const raw = await AsyncStorage.getItem(USER_KEY);
+  return raw ? JSON.parse(raw) : null;
 }
 
 // // src/utils/api.ts
